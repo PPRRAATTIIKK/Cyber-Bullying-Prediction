@@ -26,11 +26,7 @@
             --shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
         
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
             font-family: 'Inter', system-ui, sans-serif;
@@ -74,22 +70,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(10px);
         }
         
-        .header h1 {
-            font-size: 2.4rem;
-            margin-bottom: 6px;
-        }
+        .header h1 { font-size: 2.4rem; margin-bottom: 6px; }
+        .header p { opacity: 0.95; font-size: 1.15rem; }
         
-        .header p {
-            opacity: 0.95;
-            font-size: 1.15rem;
-        }
-        
-        .content {
-            padding: 40px;
-        }
+        .content { padding: 40px; }
         
         .status {
             text-align: center;
@@ -104,7 +90,7 @@
         
         textarea {
             width: 100%;
-            height: 180px;
+            height: 160px;
             padding: 20px;
             border: 2px solid var(--border);
             border-radius: 16px;
@@ -112,7 +98,6 @@
             background: var(--bg);
             color: var(--text);
             resize: vertical;
-            transition: all 0.3s;
         }
         
         textarea:focus {
@@ -123,41 +108,38 @@
         
         .btn {
             margin-top: 20px;
-            padding: 18px 32px;
+            padding: 18px;
             background: var(--primary);
             color: white;
             border: none;
             border-radius: 12px;
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
             width: 100%;
         }
         
-        .btn:hover {
-            background: #c0392b;
-            transform: translateY(-3px);
-        }
+        .btn:hover { background: #c0392b; transform: translateY(-2px); }
         
         #result {
             margin-top: 25px;
-            padding: 24px;
-            border-radius: 16px;
-            font-size: 1.1rem;
-            line-height: 1.6;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 1.05rem;
             display: none;
             border: 1px solid var(--border);
         }
         
-        .success { 
-            background: rgba(39, 174, 96, 0.1); 
-            color: #27ae60; 
-        }
+        .success { background: rgba(39, 174, 96, 0.1); color: #27ae60; }
+        .danger { background: rgba(231, 76, 60, 0.1); color: #e74c3c; }
         
-        .danger { 
-            background: rgba(231, 76, 60, 0.1); 
-            color: #e74c3c; 
+        .debug {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
         }
         
         .footer {
@@ -167,52 +149,39 @@
             font-size: 0.9rem;
             border-top: 1px solid var(--border);
         }
-        
-        .icon {
-            font-size: 1.6rem;
-            margin-right: 8px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">🌙</button>
-            <h1><span class="icon">🛡️</span>CyberGuard</h1>
-            <p>AI-Powered Cyber Bullying Detector</p>
+            <h1>🛡️ CyberGuard</h1>
+            <p>AI Cyber Bullying Detector</p>
         </div>
         
         <div class="content">
-            <div class="status" id="status">
-                ✅ Model Loaded Successfully
-            </div>
+            <div class="status" id="status">✅ Model Loaded</div>
             
-            <textarea id="inputText" placeholder="Paste any social media comment, DM, or post here..."></textarea>
+            <textarea id="inputText" placeholder="Type or paste any comment, message, or post here..."></textarea>
             
-            <button class="btn" onclick="analyzeText()">Analyze for Cyber Bullying</button>
+            <button class="btn" onclick="analyzeText()">Analyze Text</button>
             
             <div id="result"></div>
         </div>
         
         <div class="footer">
-            Built with Flask + scikit-learn • Deployed on Vercel
+            Powered by Machine Learning • Dark Mode Supported
         </div>
     </div>
 
     <script>
         const themeToggle = document.getElementById('themeToggle');
-        const currentTheme = localStorage.getItem('theme') || 
-                            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        
-        // Apply saved theme
-        if (currentTheme === 'dark') {
+        if (localStorage.getItem('theme') === 'dark' || 
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.setAttribute('data-theme', 'dark');
             themeToggle.textContent = '☀️';
-        } else {
-            themeToggle.textContent = '🌙';
         }
 
-        // Toggle theme
         themeToggle.addEventListener('click', () => {
             if (document.documentElement.getAttribute('data-theme') === 'dark') {
                 document.documentElement.removeAttribute('data-theme');
@@ -231,13 +200,13 @@
             
             if (!text) {
                 resultDiv.className = 'danger';
-                resultDiv.innerHTML = `<strong>Please enter some text to analyze.</strong>`;
+                resultDiv.innerHTML = '<strong>Please enter some text.</strong>';
                 resultDiv.style.display = 'block';
                 return;
             }
             
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `<strong>Analyzing text...</strong>`;
+            resultDiv.innerHTML = '<strong>Analyzing...</strong>';
             
             try {
                 const response = await fetch('/predict', {
@@ -248,32 +217,35 @@
                 
                 const data = await response.json();
                 
+                let html = '';
+                
                 if (data.prediction === "Bullying") {
                     resultDiv.className = 'danger';
-                    resultDiv.innerHTML = `
-                        <h2>🚨 Cyber Bullying Detected</h2>
-                        <p><strong>Original:</strong> "${data.text}"</p>
-                        <p><strong>Cleaned:</strong> "${data.cleaned_text || data.cleaned || 'N/A'}"</p>
-                    `;
+                    html = `<h2>🚨 Cyber Bullying Detected</h2>`;
                 } else {
                     resultDiv.className = 'success';
-                    resultDiv.innerHTML = `
-                        <h2>✅ Safe • No Bullying Detected</h2>
-                        <p>The message does not appear to contain cyberbullying.</p>
-                    `;
+                    html = `<h2>✅ No Bullying Detected</h2>`;
                 }
-            } catch (error) {
+                
+                html += `
+                    <p><strong>Confidence:</strong> ${data.confidence || 'N/A'}%</p>
+                    <p><strong>Raw Probability:</strong> ${data.raw_probability || 'N/A'}</p>
+                    <p><strong>Threshold:</strong> ${data.threshold_used || '0.22'}</p>
+                    <hr>
+                    <small style="opacity:0.7">Cleaned text: "${data.cleaned_text || 'N/A'}"</small>
+                `;
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (err) {
                 resultDiv.className = 'danger';
-                resultDiv.innerHTML = `<strong>Error:</strong> Could not connect to the server.`;
+                resultDiv.innerHTML = `<strong>Error:</strong> ${err.message}`;
             }
         }
 
-        // Keyboard shortcut: Ctrl + Enter
-        document.getElementById('inputText').addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'Enter') {
-                analyzeText();
-            }
+        document.getElementById('inputText').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') analyzeText();
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9ffd21eeeb003a40',t:'MTc3OTQ2NjY2Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9ffd6b53ee0947e2',t:'MTc3OTQ2OTY2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
