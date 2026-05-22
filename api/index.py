@@ -1,7 +1,6 @@
-import pickle
 import re
 import os
-import traceback
+import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import nltk
@@ -23,34 +22,21 @@ stop_words = set(stopwords.words("english"))
 
 model = None
 vectorizer = None
-label_encoder = None
-load_error = "No error"
-file_status = {}
+load_error = None
 
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    file_status['base_dir'] = base_dir
     
-    for filename in ['model.pkl', 'vectorizer.pkl', 'label_encoder.pkl']:
-        path = os.path.join(base_dir, filename)
-        file_status[filename] = {
-            "exists": os.path.exists(path),
-            "size": os.path.getsize(path) if os.path.exists(path) else 0
-        }
+    model_path = os.path.join(base_dir, "model.joblib")
+    vectorizer_path = os.path.join(base_dir, "vectorizer.joblib")
     
-    with open(os.path.join(base_dir, "model.pkl"), "rb") as f:
-        model = pickle.load(f)
-    with open(os.path.join(base_dir, "vectorizer.pkl"), "rb") as f:
-        vectorizer = pickle.load(f)
-    if os.path.exists(os.path.join(base_dir, "label_encoder.pkl")):
-        with open(os.path.join(base_dir, "label_encoder.pkl"), "rb") as f:
-            label_encoder = pickle.load(f)
+    model = joblib.load(model_path)
+    vectorizer = joblib.load(vectorizer_path)
     
-    print("✅ All models loaded successfully!")
+    print("✅ Model and vectorizer loaded successfully using joblib!")
 except Exception as e:
     load_error = str(e)
-    print("❌ CRITICAL ERROR:", load_error)
-    print(traceback.format_exc())
+    print("❌ Loading failed:", load_error)
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
@@ -63,11 +49,9 @@ def preprocess(text):
 @app.route("/")
 def home():
     return jsonify({
-        "status": "API is running",
+        "status": "Cyber Bullying Prediction API is running",
         "model_loaded": model is not None,
-        "file_status": file_status,
-        "error": load_error,
-        "base_dir": os.path.dirname(os.path.abspath(__file__))
+        "error": load_error
     })
 
 @app.route("/predict", methods=["POST"])
@@ -75,8 +59,7 @@ def predict():
     if not model or not vectorizer:
         return jsonify({
             "error": "Model failed to load",
-            "details": load_error,
-            "file_status": file_status
+            "details": load_error
         }), 500
     
     try:
@@ -89,12 +72,8 @@ def predict():
         cleaned = preprocess(text)
         vector = vectorizer.transform([cleaned])
         
-        if hasattr(model, "predict_proba"):
-            proba = model.predict_proba(vector)[0]
-            bullying_prob = float(proba[1] if len(proba) > 1 else proba[0])
-        else:
-            pred = int(model.predict(vector)[0])
-            bullying_prob = 0.9 if pred == 1 else 0.1
+        proba = model.predict_proba(vector)[0]
+        bullying_prob = float(proba[1] if len(proba) > 1 else proba[0])
         
         threshold = 0.25
         is_bullying = bullying_prob >= threshold
