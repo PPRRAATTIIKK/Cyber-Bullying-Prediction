@@ -7,7 +7,6 @@ from flask_cors import CORS
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
-import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -24,20 +23,34 @@ stop_words = set(stopwords.words("english"))
 
 model = None
 vectorizer = None
-load_error = None
+label_encoder = None
+load_error = "No error"
+file_status = {}
 
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_status['base_dir'] = base_dir
+    
+    for filename in ['model.pkl', 'vectorizer.pkl', 'label_encoder.pkl']:
+        path = os.path.join(base_dir, filename)
+        file_status[filename] = {
+            "exists": os.path.exists(path),
+            "size": os.path.getsize(path) if os.path.exists(path) else 0
+        }
     
     with open(os.path.join(base_dir, "model.pkl"), "rb") as f:
         model = pickle.load(f)
     with open(os.path.join(base_dir, "vectorizer.pkl"), "rb") as f:
         vectorizer = pickle.load(f)
-        
-    print("✅ Model loaded successfully")
+    if os.path.exists(os.path.join(base_dir, "label_encoder.pkl")):
+        with open(os.path.join(base_dir, "label_encoder.pkl"), "rb") as f:
+            label_encoder = pickle.load(f)
+    
+    print("✅ All models loaded successfully!")
 except Exception as e:
     load_error = str(e)
-    print("❌ Loading error:", load_error)
+    print("❌ CRITICAL ERROR:", load_error)
+    print(traceback.format_exc())
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
@@ -50,15 +63,21 @@ def preprocess(text):
 @app.route("/")
 def home():
     return jsonify({
-        "status": "Cyber Bullying Prediction API is running",
+        "status": "API is running",
         "model_loaded": model is not None,
-        "note": "Threshold is set low to detect more bullying cases"
+        "file_status": file_status,
+        "error": load_error,
+        "base_dir": os.path.dirname(os.path.abspath(__file__))
     })
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model or not vectorizer:
-        return jsonify({"error": "Model not loaded", "details": load_error}), 500
+        return jsonify({
+            "error": "Model failed to load",
+            "details": load_error,
+            "file_status": file_status
+        }), 500
     
     try:
         data = request.get_json()
@@ -70,28 +89,24 @@ def predict():
         cleaned = preprocess(text)
         vector = vectorizer.transform([cleaned])
         
-        bullying_prob = 0.5
         if hasattr(model, "predict_proba"):
             proba = model.predict_proba(vector)[0]
-            # Take the probability of the positive (bullying) class
-            bullying_prob = proba[1] if len(proba) > 1 else proba[0]
+            bullying_prob = float(proba[1] if len(proba) > 1 else proba[0])
         else:
-            pred = model.predict(vector)[0]
+            pred = int(model.predict(vector)[0])
             bullying_prob = 0.9 if pred == 1 else 0.1
         
-        # Very low threshold to make it more sensitive
-        threshold = 0.22
+        threshold = 0.25
         is_bullying = bullying_prob >= threshold
-        
         result = "Bullying" if is_bullying else "Not Bullying"
         
         return jsonify({
             "text": text,
             "prediction": result,
-            "confidence": round(float(bullying_prob) * 100, 1),
+            "confidence": round(bullying_prob * 100, 1),
+            "raw_probability": round(bullying_prob, 4),
             "threshold_used": threshold,
-            "cleaned_text": cleaned,
-            "raw_probability": round(float(bullying_prob), 4)
+            "cleaned_text": cleaned
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
