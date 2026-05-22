@@ -15,59 +15,55 @@ CORS(app)
 stemmer = SnowballStemmer("english")
 stop_words = set(stopwords.words("english"))
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Load model and vectorizer
-model = None
-vectorizer = None
-
+# Load model at cold start
 try:
-    with open(os.path.join(BASE_DIR, "model.pkl"), "rb") as f:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base_dir, "model.pkl"), "rb") as f:
         model = pickle.load(f)
-    with open(os.path.join(BASE_DIR, "vectorizer.pkl"), "rb") as f:
+    with open(os.path.join(base_dir, "vectorizer.pkl"), "rb") as f:
         vectorizer = pickle.load(f)
-    print("✅ Model and vectorizer loaded successfully!")
+    print("✅ Model loaded successfully")
 except Exception as e:
-    print(f"❌ Error loading model: {e}")
+    model = None
+    vectorizer = None
+    print(f"❌ Model load failed: {e}")
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
     text = re.sub(r'http\S+', '', text)
     text = re.sub(r'[^a-zA-Z\s]', '', text)
     text = text.lower()
-    tokens = text.split()
-    tokens = [stemmer.stem(w) for w in tokens if w not in stop_words]
+    tokens = [stemmer.stem(w) for w in text.split() if w not in stop_words]
     return " ".join(tokens)
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-    status = "✅ Model Loaded" if model and vectorizer else "❌ Model Not Loaded"
     return jsonify({
-        "status": "Cyber Bullying Prediction API is running!",
-        "model_status": status
+        "status": "Cyber Bullying Prediction API is live on Vercel!",
+        "model_loaded": model is not None
     })
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model or not vectorizer:
-        return jsonify({"error": "Model not loaded properly"}), 500
+        return jsonify({"error": "Model not loaded"}), 500
     
     data = request.get_json()
-    text = data.get("text", "").strip()
+    text = data.get("text", "")
     
     if not text:
         return jsonify({"error": "No text provided"}), 400
     
     cleaned = preprocess(text)
-    vec = vectorizer.transform([cleaned])
-    prediction = model.predict(vec)[0]
+    vector = vectorizer.transform([cleaned])
+    prediction = model.predict(vector)[0]
     result = "Bullying" if prediction == 1 else "Not Bullying"
     
     return jsonify({
         "text": text,
         "prediction": result,
-        "cleaned_text": cleaned
+        "cleaned": cleaned
     })
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
 
+# This is required for Vercel
+app.debug = False
