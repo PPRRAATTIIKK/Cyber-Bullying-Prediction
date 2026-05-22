@@ -14,12 +14,18 @@ stemmer = SnowballStemmer("english")
 stop_words = set(stopwords.words("english"))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = None
+vectorizer = None
 
-with open(os.path.join(BASE_DIR, "model.pkl"), "rb") as f:
-    model = pickle.load(f)
-
-with open(os.path.join(BASE_DIR, "vectorizer.pkl"), "rb") as f:
-    vectorizer = pickle.load(f)
+# Load model safely
+try:
+    with open(os.path.join(BASE_DIR, "model.pkl"), "rb") as f:
+        model = pickle.load(f)
+    with open(os.path.join(BASE_DIR, "vectorizer.pkl"), "rb") as f:
+        vectorizer = pickle.load(f)
+    print("✅ Model loaded successfully")
+except Exception as e:
+    print(f"❌ Model loading failed: {e}")
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
@@ -32,10 +38,17 @@ def preprocess(text):
 
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"status": "API is running!"})
+    status = "✅ ready" if model else "❌ model not loaded"
+    return jsonify({"status": "API running", "model": status})
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    if not model or not vectorizer:
+        return jsonify({"error": "Model not loaded. Check if pkl files exist in api/ folder."}), 500
     data = request.get_json()
     text = data.get("text", "")
     if not text:
