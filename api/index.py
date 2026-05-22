@@ -26,17 +26,12 @@ load_error = None
 
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    model_path = os.path.join(base_dir, "model.joblib")
-    vectorizer_path = os.path.join(base_dir, "vectorizer.joblib")
-    
-    model = joblib.load(model_path)
-    vectorizer = joblib.load(vectorizer_path)
-    
-    print("✅ Model and vectorizer loaded successfully using joblib!")
+    model = joblib.load(os.path.join(base_dir, "model.joblib"))
+    vectorizer = joblib.load(os.path.join(base_dir, "vectorizer.joblib"))
+    print("✅ Model loaded successfully!")
 except Exception as e:
     load_error = str(e)
-    print("❌ Loading failed:", load_error)
+    print("❌ Error loading model:", load_error)
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
@@ -49,7 +44,7 @@ def preprocess(text):
 @app.route("/")
 def home():
     return jsonify({
-        "status": "Cyber Bullying Prediction API is running",
+        "status": "API is running",
         "model_loaded": model is not None,
         "error": load_error
     })
@@ -57,38 +52,31 @@ def home():
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model or not vectorizer:
-        return jsonify({
-            "error": "Model failed to load",
-            "details": load_error
-        }), 500
+        return jsonify({"error": "Model not loaded", "details": load_error}), 500
     
-    try:
-        data = request.get_json()
-        text = data.get("text", "").strip()
-        
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
-        
-        cleaned = preprocess(text)
-        vector = vectorizer.transform([cleaned])
-        
-        proba = model.predict_proba(vector)[0]
-        bullying_prob = float(proba[1] if len(proba) > 1 else proba[0])
-        
-        threshold = 0.25
-        is_bullying = bullying_prob >= threshold
-        result = "Bullying" if is_bullying else "Not Bullying"
-        
-        return jsonify({
-            "text": text,
-            "prediction": result,
-            "confidence": round(bullying_prob * 100, 1),
-            "raw_probability": round(bullying_prob, 4),
-            "threshold_used": threshold,
-            "cleaned_text": cleaned
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.get_json()
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+    
+    cleaned = preprocess(text)
+    vector = vectorizer.transform([cleaned])
+    
+    proba = model.predict_proba(vector)[0]
+    bullying_prob = float(proba[1])
+    threshold = 0.22
+    
+    is_bullying = bullying_prob >= threshold
+    result = "Bullying" if is_bullying else "Not Bullying"
+    
+    return jsonify({
+        "text": text,
+        "prediction": result,
+        "confidence": round(bullying_prob * 100, 1),
+        "raw_probability": round(bullying_prob, 4),
+        "threshold_used": threshold,
+        "cleaned_text": cleaned
+    })
 
 if __name__ == "__main__":
     app.run()
