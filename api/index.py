@@ -70,5 +70,3 @@ def predict():
     })
 
 
-    app.run(host="0.0.0.0", port=5000)
->>>>>>> d904ad97b4a52a04c85dcc04d77551a3f8c979d6
