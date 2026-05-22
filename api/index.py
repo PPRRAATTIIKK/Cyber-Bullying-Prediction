@@ -1,4 +1,6 @@
-import pickle, re, os
+import pickle
+import re
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import nltk
@@ -14,18 +16,19 @@ stemmer = SnowballStemmer("english")
 stop_words = set(stopwords.words("english"))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Load model and vectorizer
 model = None
 vectorizer = None
 
-# Load model safely
 try:
     with open(os.path.join(BASE_DIR, "model.pkl"), "rb") as f:
         model = pickle.load(f)
     with open(os.path.join(BASE_DIR, "vectorizer.pkl"), "rb") as f:
         vectorizer = pickle.load(f)
-    print("✅ Model loaded successfully")
+    print("✅ Model and vectorizer loaded successfully!")
 except Exception as e:
-    print(f"❌ Model loading failed: {e}")
+    print(f"❌ Error loading model: {e}")
 
 def preprocess(text):
     text = re.sub(r'<.*?>', '', text)
@@ -38,26 +41,33 @@ def preprocess(text):
 
 @app.route("/", methods=["GET"])
 def home():
-    status = "✅ ready" if model else "❌ model not loaded"
-    return jsonify({"status": "API running", "model": status})
-
-@app.route("/favicon.ico")
-def favicon():
-    return "", 204
+    status = "✅ Model Loaded" if model and vectorizer else "❌ Model Not Loaded"
+    return jsonify({
+        "status": "Cyber Bullying Prediction API is running!",
+        "model_status": status
+    })
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model or not vectorizer:
-        return jsonify({"error": "Model not loaded. Check if pkl files exist in api/ folder."}), 500
+        return jsonify({"error": "Model not loaded properly"}), 500
+    
     data = request.get_json()
-    text = data.get("text", "")
+    text = data.get("text", "").strip()
+    
     if not text:
         return jsonify({"error": "No text provided"}), 400
+    
     cleaned = preprocess(text)
     vec = vectorizer.transform([cleaned])
     prediction = model.predict(vec)[0]
     result = "Bullying" if prediction == 1 else "Not Bullying"
-    return jsonify({"text": text, "prediction": result})
+    
+    return jsonify({
+        "text": text,
+        "prediction": result,
+        "cleaned_text": cleaned
+    })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
