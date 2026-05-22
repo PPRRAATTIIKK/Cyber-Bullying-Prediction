@@ -18,7 +18,7 @@ os.makedirs('/tmp/nltk_data', exist_ok=True)
 try:
     nltk.download('stopwords', quiet=True, download_dir='/tmp/nltk_data')
 except:
-    pass  # Ignore download errors on Vercel
+    pass
 
 stemmer = SnowballStemmer("english")
 stop_words = set(stopwords.words("english"))
@@ -83,6 +83,5 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Required for Vercel
 if __name__ == "__main__":
     app.run()
