@@ -14,7 +14,6 @@ CORS(app)
 # Fix for Vercel read-only filesystem
 nltk.data.path.append('/tmp/nltk_data')
 os.makedirs('/tmp/nltk_data', exist_ok=True)
-
 try:
     nltk.download('stopwords', quiet=True, download_dir='/tmp/nltk_data')
 except:
@@ -25,18 +24,24 @@ stop_words = set(stopwords.words("english"))
 
 model = None
 vectorizer = None
+label_encoder = None
 load_error = None
 
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    
     with open(os.path.join(base_dir, "model.pkl"), "rb") as f:
         model = pickle.load(f)
     with open(os.path.join(base_dir, "vectorizer.pkl"), "rb") as f:
         vectorizer = pickle.load(f)
-    print("✅ Model loaded successfully!")
+    with open(os.path.join(base_dir, "label_encoder.pkl"), "rb") as f:
+        label_encoder = pickle.load(f)
+        
+    print("✅ Model, vectorizer, and label encoder loaded successfully!")
+    print("Classes:", label_encoder.classes_)
 except Exception as e:
     load_error = str(e)
-    print("❌ Model loading failed:")
+    print("❌ Loading failed:")
     print(traceback.format_exc())
 
 def preprocess(text):
@@ -50,18 +55,16 @@ def preprocess(text):
 @app.route("/")
 def home():
     return jsonify({
-        "status": "Cyber Bullying Prediction API is running on Vercel",
+        "status": "Cyber Bullying Prediction API is running",
         "model_loaded": model is not None,
+        "classes": list(label_encoder.classes_) if label_encoder else None,
         "error": load_error
     })
 
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model or not vectorizer:
-        return jsonify({
-            "error": "Model not loaded",
-            "details": load_error or "Unknown error"
-        }), 500
+        return jsonify({"error": "Model not loaded", "details": load_error}), 500
     
     try:
         data = request.get_json()
@@ -73,12 +76,21 @@ def predict():
         cleaned = preprocess(text)
         vector = vectorizer.transform([cleaned])
         prediction = model.predict(vector)[0]
-        result = "Bullying" if prediction == 1 else "Not Bullying"
+        
+        # Use label encoder to get proper label
+        if label_encoder:
+            result = label_encoder.inverse_transform([prediction])[0]
+            is_bullying = result.lower() == "yes" or result == 1
+        else:
+            is_bullying = prediction == 1
+            result = "Yes" if is_bullying else "No"
         
         return jsonify({
             "text": text,
-            "prediction": result,
-            "cleaned_text": cleaned
+            "prediction": "Bullying" if is_bullying else "Not Bullying",
+            "raw_prediction": int(prediction),
+            "cleaned_text": cleaned,
+            "label_used": result
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
